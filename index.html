@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Search & Upload</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>My Photo App - ss18851</h1>
+            <p class="app-description">Upload, search, and manage your photo collection</p>
+        </header>
+
+        <div class="main-content">
+            <!-- LEFT PANEL: UPLOAD FORM -->
+            <div class="left-panel">
+                <section id="uploadSection" class="card">
+                    <h2>Upload a Photo</h2>
+                    <div class="form-group">
+                        <div class="file-input-wrapper">
+                            <label class="file-input-label" for="fileInput">
+                                <span>Click or drag to choose a file</span>
+                            </label>
+                            <input type="file" id="fileInput" accept="image/*" />
+                        </div>
+                        <div id="imagePreview" class="image-preview">
+                            <img id="previewImg" src="/placeholder.svg" alt="Preview" />
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="customLabelsInput">Custom labels (comma-separated)</label>
+                        <input type="text" id="customLabelsInput" placeholder="E.g. nature, vacation, family" />
+                    </div>
+                    <button id="uploadBtn" class="btn btn-block">Upload Photo</button>
+                    <div id="uploadStatus"></div>
+                </section>
+            </div>
+
+            <!-- RIGHT PANEL: SEARCH AND RESULTS -->
+            <div class="right-panel">
+                <section id="searchSection" class="card">
+                    <h2>Search Photos</h2>
+                    <div class="search-form">
+                        <input type="text" id="searchInput" placeholder="Enter search term" class="search-input" />
+                        <button id="searchBtn" class="btn">Search</button>
+                    </div>
+                </section>
+
+                <!-- RESULTS -->
+                <div id="results" class="results-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // —————– CONFIG —————–
+        const API_BASE = 'https://ik80a4tzv2.execute-api.us-east-1.amazonaws.com/dev';
+        const SEARCH_URL = `${API_BASE}/search`;
+        const UPLOAD_URL = `${API_BASE}/photos`;
+        const API_KEY = 'YikkjTIddP1yH73euYnep8I0shNxhDkq46gDuRxw';
+
+        // —————– SEARCH —————–
+        async function doSearch() {
+            const q = document.getElementById('searchInput').value.trim();
+            if (!q) return;
+
+            try {
+                const res = await fetch(`${SEARCH_URL}?q=${encodeURIComponent(q)}`, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'x-api-key': API_KEY
+                    }
+                });
+                if (!res.ok) throw new Error(`Search failed (${res.status})`);
+
+                const { results } = await res.json();
+                const container = document.getElementById('results');
+                container.innerHTML = '';
+
+                if (results.length === 0) {
+                    container.innerHTML = '<div class="no-results">No photos found. Try a different search term.</div>';
+                    return;
+                }
+
+                results.forEach(r => {
+                    const card = document.createElement('div');
+                    card.className = 'photo-card';
+                    card.innerHTML = `
+                        <img src="${r.url}" alt="photo" />
+                        <div class="photo-info">
+                            <span> </span>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (err) {
+                console.error(err);
+                alert(err.message);
+            }
+        }
+
+        // —————– UPLOAD —————–
+        async function doUpload() {
+            const fileEl = document.getElementById('fileInput');
+            const status = document.getElementById('uploadStatus');
+            const labels = document.getElementById('customLabelsInput').value.trim();
+
+            if (!fileEl.files.length) {
+                status.className = 'error';
+                status.textContent = 'Please choose a file first.';
+                status.style.display = 'block';
+                return;
+            }
+
+            const file = fileEl.files[0];
+            const key = encodeURIComponent(file.name);
+
+            status.className = 'loading';
+            status.textContent = 'Uploading...';
+            status.style.display = 'block';
+
+            try {
+                const res = await fetch(`${UPLOAD_URL}/${key}`, {
+                    method: 'PUT',
+                    mode: 'cors',
+                    headers: {
+                        'x-api-key': API_KEY,
+                        'Content-Type': file.type,
+                        // this header carries your custom labels as a comma-separated string:
+                        'x-amz-meta-customLabels': labels,
+                    },
+                    body: file
+                });
+
+                if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+                status.className = 'success';
+                status.textContent = 'Upload successful!';
+                hideStatus();
+            } catch (err) {
+                console.error(err);
+                status.className = 'error';
+                status.textContent = err.message;
+            }
+        }
+
+        // —————– EVENT BINDING —————–
+        document.getElementById('searchBtn').addEventListener('click', doSearch);
+        document.getElementById('uploadBtn').addEventListener('click', doUpload);
+
+        // —————– IMAGE PREVIEW —————–
+        document.getElementById('fileInput').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const preview = document.getElementById('imagePreview');
+                    const previewImg = document.getElementById('previewImg');
+                    previewImg.src = e.target.result;
+                    preview.classList.add('show');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // —————– AUTO-HIDE STATUS —————–
+        function hideStatus() {
+            setTimeout(() => {
+                const status = document.getElementById('uploadStatus');
+                status.style.display = 'none';
+            }, 3000); // Hide after 3 seconds
+        }
+    </script>
+</body>
+
+</html>
